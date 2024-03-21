@@ -18,6 +18,8 @@ import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorManager
 import android.media.MediaPlayer
+import android.util.Log
+import android.widget.Button
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
@@ -41,9 +43,12 @@ class MainActivity : AppCompatActivity() {
     // Define languages, corresponding vacation spots, and greetings
     private val languageMap = mapOf(
         INITIAL_PROMPT to Pair("", ""),
-        "Spanish" to Pair("geo:19.432608,-99.133209", "Hola"), // Mexico City, Mexico
-        "French" to Pair("geo:48.856614,2.352222", "Bonjour"), // Paris, France
-        "Chinese" to Pair("geo:39.904200,116.407396", "NiHao") // Beijing, China
+        "Spanish" to Pair("geo:19.432608,-99.133209?q=Madrid", "Hola"), // Madrid, Spain
+        "French" to Pair("geo:48.856614,2.352222?q=Paris", "Bonjour"), // Paris, France
+        "Chinese" to Pair("geo:39.904200,116.407396?q=Beijing", "NiHao"), // Beijing, China
+        "Japanese" to Pair("geo:35.689487,139.691706?q=Tokyo", "Konichiwa"), // Tokyo, Japan
+        "German" to Pair("geo:52.520008,13.404954?q=Berlin", "Hallo"), // Berlin, Germany
+        "Italian" to Pair("geo:41.902784,12.496366?q=Rome", "Ciao") // Rome, Italy// Beijing, China
     )
 
     private var selectedLanguage: String? = null
@@ -51,6 +56,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
 
         languageSpinner = findViewById(R.id.spinnerLanguages)
         editText = findViewById(R.id.etTranscribedText)
@@ -61,6 +67,7 @@ class MainActivity : AppCompatActivity() {
         shakeDetector = ShakeDetector().apply {
             setOnShakeListener(object : ShakeDetector.OnShakeListener {
                 override fun onShake() {
+                    Log.d("ShakeDetector", "Shake detected!")
                     onShakeDetected()
                 }
             })
@@ -122,22 +129,28 @@ class MainActivity : AppCompatActivity() {
     private fun onShakeDetected() {
         selectedLanguage?.let { language ->
             languageMap[language]?.first?.let { geoUri ->
-                if (geoUri.isNotEmpty()) { // Now geoUri is correctly treated as a String
-                    val gmmIntentUri = Uri.parse(geoUri) // Parse the String geoUri to a Uri
+                if (geoUri.isNotEmpty()) {
+                    val gmmIntentUri = Uri.parse(geoUri)
                     val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
-                    mapIntent.setPackage("com.google.android.apps.maps") // Target Google Maps app specifically
+                    playGreeting(language)
 
-                    // Check if there's an app available that can handle the geo URI (preferably Google Maps)
                     if (mapIntent.resolveActivity(packageManager) != null) {
-                        startActivity(mapIntent) // Start the map activity with the geo URI
+                        startActivity(mapIntent) // Start the intent to open the map
+                        playGreeting(language) // Play the greeting after launching the map
                     } else {
-                        // Handle the case where Google Maps or a suitable app is not installed
+                        // Fallback mechanism if no app can handle the geo URI
+                        val query = geoUri.substringAfter("?q=")
+
+                        // Log the extracted query
+                        Log.d("ShakeDetection", "Extracted query: $query")
+
+                        val fallbackIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/search/?api=1&query=$query"))
+                        startActivity(fallbackIntent)
                     }
                 }
             }
         }
     }
-
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         when (requestCode) {
@@ -168,7 +181,7 @@ class MainActivity : AppCompatActivity() {
             "Spanish" -> R.raw.hola
             "French" -> R.raw.bonjour
             "Chinese" -> R.raw.nihao
-            else -> null
+            else -> null // can follow this example for the rest
         }
 
         greetingResId?.let {
